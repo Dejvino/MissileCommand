@@ -1,0 +1,108 @@
+#include "gfx.h" 
+
+
+void drawM(int x, int y, int height, int width){
+	gfx_line(x,y,x,y-height); 
+	gfx_line(x,y-height,x+width/2,y); 
+	gfx_line(x+width/2,y,x+width,y-height); 
+	gfx_line(x+width,y-height,x+width,y); 
+}
+void drawI(int x, int y, int height){
+	gfx_line(x,y,x,y-height); 
+}
+void drawS(int x, int y, int height, int width){
+	gfx_line(x,y,x+width,y);
+	gfx_line(x+width,y,x+width,y-height/2); 
+	gfx_line(x+width,y-height/2,x,y-height/2); 
+	gfx_line(x,y-height/2,x,y-height); 
+	gfx_line(x,y-height,x+width,y-height); 
+}
+void drawL(int x, int y, int height, int width){
+	gfx_line(x,y,x+width,y); 
+	gfx_line(x,y,x,y-height); 
+}
+void drawE(int x, int y, int height, int width){
+	gfx_line(x,y,x+width,y); 
+	gfx_line(x,y,x,y-height); 
+	gfx_line(x,y-height/2,x+width,y-height/2); 
+	gfx_line(x,y-height,x+width,y-height); 
+}
+void drawC(int x, int y, int height, int width){
+	gfx_line(x,y,x+width,y); 
+	gfx_line(x,y,x,y-height); 
+	gfx_line(x,y-height,x+width,y-height); 
+}
+void drawO(int x, int y, int height, int width){
+	gfx_line(x,y,x+width,y); 
+	gfx_line(x,y,x,y-height); 
+	gfx_line(x,y-height,x+width,y-height); 
+	gfx_line(x+width,y,x+width,y-height); 
+}
+void drawA(int x, int y, int height, int width){
+	gfx_line(x,y,x+width/2,y-height); 
+	gfx_line(x+width/2,y-height,x+width,y); 
+	gfx_line(x+width/4,y-height/2,x+3*width/4,y-height/2); 
+}
+void drawN(int x, int y, int height, int width){
+	gfx_line(x,y,x,y-height); 
+	gfx_line(x,y-height,x+width,y); 
+	gfx_line(x+width,y,x+width,y-height); 
+}
+
+void drawP(int x, int y, int height, int width){
+	gfx_line(x,y,x,y-height); 
+	gfx_line(x,y-height,x+width,y-height); 
+	gfx_line(x+width,y-height,x+width,y-height/2); 
+	gfx_line(x,y-height/2,x+width,y-height/2); 
+}
+void drawR(int x, int y, int height, int width){
+	gfx_line(x,y,x,y-height); 
+	gfx_line(x,y-height,x+width,y-height); 
+	gfx_line(x+width,y-height,x+width,y-height/2); 
+	gfx_line(x,y-height/2,x+width,y-height/2); 
+	gfx_line(x,y-height/2,x+width,y); 
+}
+void drawT(int x, int y, int height, int width){
+	gfx_line(x,y,x,y-height); 
+	gfx_line(x-width/2,y-height,x+width/2,y-height); 
+}
+void drawD(int x, int y, int height, int width){
+	gfx_line(x,y,x+width,y); 
+	gfx_line(x+width/5,y,x+width/5,y-height); 
+	gfx_line(x,y-height,x+width,y-height); 
+	gfx_line(x+width,y,x+width,y-height); 
+}
+void drawMainMenu(void){
+	int x = 100; 
+	int offset = 30; 
+	int iOffset = 8; 
+	drawM(x,100,50,20);x+=offset; 
+	drawI(x,100,50); x+=iOffset;
+	drawS(x,100,50,20); x+=offset;
+	drawS(x,100,50,20); x+=offset;
+	drawI(x,100,50); x+=iOffset; 
+	drawL(x,100,50,20); x+=offset; 
+	drawE(x,100,50,20);
+
+	gfx_color(255,0,0); 
+	x = 120; 
+	drawC(x,200,50,20); x+=offset; 
+	drawO(x,200,50,20); x+=offset; 
+	drawM(x,200,50,20); x+=offset; 
+	drawM(x,200,50,20); x+=offset; 
+	drawA(x,200,50,20); x+=offset; 
+	drawN(x,200,50,20); x+=offset; 
+	drawD(x,200,50,15);  
+
+	gfx_color(255,255,255); 
+	x = 100; 
+	drawP(x,400,50,20); x+=offset; 
+	drawR(x,400,50,20); x+=offset; 
+	drawE(x,400,50,20); x+=offset; 
+	drawS(x,400,50,20); x+=offset; 
+	drawS(x,400,50,20); x+=2*offset; 
+	drawS(x,400,50,20);
+}
+
+
+

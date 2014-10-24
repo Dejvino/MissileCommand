@@ -1,0 +1,654 @@
+#include "gfx.h"
+#include <math.h>
+#include <stdlib.h>
+#include <time.h>
+#include "numbers.h"
+#include <stdio.h>
+#include "letters.h"
+#include <limits.h>
+#define WIDTH 600
+#define HEIGHT 500
+#define EXPNUM 14  //Number of explosions that can be used at once
+#define NUMCITIES 6
+
+
+struct Explosion{
+    double r;  //The radius of the explosion
+    double x;  //The location of the explosion
+    double y;
+    double maxR;  //Max radius the explosion will have
+    double minR;
+    double startR; //The starting radius of the explosion
+    int isAlive; //If the explosion is active
+    double rVel; //Rate at which the radius is changing
+};
+
+struct Missile{
+    int xDest;   //Where the missile is going
+    int yDest;
+    double xStart; //Where the missile is coming from
+    double yStart;
+    double x;  //The current location of the missile
+    double y;
+    double xVel; //The velocity of the missile
+    double yVel;
+    int isAlive; //If the missile is currently active
+    struct Explosion exp;
+};
+
+struct Missile_Node{
+   struct Missile * m;
+};
+
+
+
+struct City{
+    int x; //Location of the city
+    int y;
+    int isAlive; //If the city is active
+};
+
+struct Tower{
+    int x; //Location of the tower
+    int y;
+    int isAlive; //If the tower is active
+
+};
+
+//Construct typedefs for each of the structures so that they are more easily called
+typedef struct City city;
+typedef struct Missile missile;
+typedef struct Explosion explosion;
+typedef struct Tower tower;
+
+void drawCity(int x, int y);
+void drawBackground(void);
+void drawCities(city * cities);
+void drawLand(void);
+void mainMenu(void);
+void initializeStructures(tower towers[],city * cities, missile * enemyMissiles, missile *myMissile, explosion * explosions);
+void shootMissile(tower towers[], missile * myMissile);
+void updateMyMissiles(missile *myMissile, explosion * explosions);
+void drawMyMissile(missile *myMissile);
+void startExplosion(missile *m);
+void updateExplosions(missile *m, missile enemyMissiles[]);
+void drawExplosions(missile *m, missile enemyMissiles[]);
+void drawCircle(int xpos, int ypos, float r);
+void updateEnemyMissiles(missile *myMissile,tower towers[], city * cities,missile *enemyMissiles, explosion * explosions, time_t *timeSinceMissile, int *score, time_t difficulty);
+void drawEnemyMissiles(missile * enemyMissiles);
+int checkCollision(missile missiles[],tower towers[],city * cities,explosion *exp, missile * m, explosion * explosions, int *score);
+void updateObjects(tower towers[],city * cities, missile * enemyMissiles, missile *myMissile, explosion * explosions,time_t * timeSinceMissile,int *score, time_t difficulty);
+int checkGameOver(city *cities);
+void drawMissileTower(int x, int y);
+void drawTowers(tower towers[]);
+void gameOver(int score);
+void drawGameOver(int score);
+void drawMainMenu(void);
+void saveScore(int score);
+
+
+//Main function for the game:
+int main(void){
+    gfx_open(WIDTH,HEIGHT,"MISSILE COMMAND");     
+
+    time_t timeSinceMissile = time(NULL);  //Used to delay the firing of the enemy missiles
+    time_t difficulty = time(NULL);  //Used to calculate speed of missiles 
+
+    mainMenu();   //Set up the main menu
+
+    int gameLoop = 1;  //Continue the game if this is true.
+    int score = 0; //will be used to calculate the user's score
+   
+    //Initialize structures
+
+    tower towers[3]; //3 missile towers
+    city cities[NUMCITIES];  //There are 6 cities to start with.
+    missile enemyMissiles[15]; //15 possible enemy missiles at one time
+    missile myMissile;  //My missile only can shoot one at a time.
+    explosion explosions[EXPNUM];
+   
+
+    //Set up all of the structures:
+    initializeStructures(towers,cities,enemyMissiles,&myMissile,explosions);
+  
+    //While this is running, the game works
+    while(gameLoop){
+	if(gfx_event_waiting()){
+
+		char c = gfx_wait();
+		switch(c){
+			case 'q':
+				gameLoop = 0;
+				break;
+			case 's':   
+			case 1:
+				shootMissile(towers,&myMissile);
+				break;
+		}
+	}
+	drawBackground();  //Draw the background of the game
+	updateObjects(towers,cities,enemyMissiles,&myMissile,explosions,&timeSinceMissile,&score,difficulty);
+	draw_number(40,40,50,score);
+	gfx_flush(); //Update the graphics
+	usleep(10000); 
+	   
+	if(checkGameOver(cities)){
+		    gameLoop = 0;  
+		   
+	}
+    }
+    gameOver(score);
+
+}
+
+
+
+//Draws a city at a given location
+
+void drawCity(int x, int y){
+    gfx_color(0,0,255);
+    int i;
+    for(i=x;i<x+30;i++){//Draw a base that is 30 pixels wide, starting at x
+       gfx_line(i,y,i,y+10); //Base is 10 pixels high.  
+    }
+    int j;
+    for(j=x;j<x+5;j++){
+       gfx_line(j,y,j,y-10);  //Draw chimney thing
+    }
+}
+
+
+
+//Draws a missileTower at a given location
+void drawMissileTower(int x, int y){
+   gfx_color(0,255,0);
+   int i;
+   for(i=x;i<x+20;i++){//Draw a base that is 20 pixels wide, starting at x
+            gfx_line(i,y,i,y+10); //Base is 10 pixels high.  
+   }
+   
+   int j;
+   for(j=x+8;j<x+12;j++){
+           gfx_line(j,y,j,y-10);
+   }
+}
+
+
+//Draws the array of towers
+void drawTowers(tower towers[]){
+   int i,x;
+       for(i=0;i<3;i++){
+       		if(towers[i].isAlive){
+           	drawMissileTower(towers[i].x,HEIGHT*5/6);     
+       }
+    }
+}
+
+
+//Draws the background (essentially just the ground.)
+void drawBackground(void){
+    gfx_clear();
+    gfx_color(255,0,0);
+    drawLand();
+}
+
+//Draw the array of the cities given
+void drawCities(city cities[]){
+    int i;
+    for(i=0;i<NUMCITIES;i++){
+       if(cities[i].isAlive){
+           drawCity(cities[i].x,HEIGHT*5/6);     
+       }
+    }
+}
+
+//Draws a rectangle at the bottom of the screen
+void drawLand(void){
+    int i;
+    for(i=HEIGHT*5/6;i<HEIGHT;i++){
+       gfx_line(0,i,WIDTH-1,i);
+    }
+}
+
+void saveScore(int score){
+    FILE *f;
+    f = fopen("scores.txt","a");
+    if(f == NULL) printf("Unable to open file\n");
+    else{
+        puts("Enter your initials");
+        char word[100];
+        scanf("%s", word);
+        fprintf(f, "%s -- %d\n", word, score);
+        fclose(f);
+    }   
+}
+
+void drawMainMenu(void){
+    drawWord("missile", 100, 100, 50, 20);
+    gfx_color(255,0,0);
+    drawWord("command", 120, 200, 50, 20);
+    gfx_color(255,255,255);
+    drawWord("press",100,400,50,20);
+    drawS(280,400,50,20);
+}
+
+// Display a Game Over screen with the score
+void gameOver(int score){
+    gfx_clear();
+    drawGameOver(score);
+    char c; 
+    while(c != 'y' && c!='n'){
+	c= gfx_wait();
+    	if(c == 'y'){
+		saveScore(score);
+	}
+    }
+}
+
+void drawGameOver(int score){
+    gfx_color(255,0,0);
+    drawWord("game",200,120,100,40);
+    drawWord("over",200,240,100,40);
+    gfx_color(0,255,0);
+    drawWord("your score", 50,340, 50, 20);
+    draw_number(400, 290, 50, score);
+    gfx_color(255,255,255);
+    drawWord("save score? [y/n]",50,440,50,20);
+}
+
+void mainMenu(void){
+    int main = 1;
+    
+    while(main){
+    
+       drawMainMenu();
+       usleep(2000);
+       char c = gfx_wait();
+       
+       switch(c){
+           case 'q':
+               exit(0);
+               break;     
+           case 's':
+               main=0;
+               gfx_xpos();
+               gfx_ypos();
+               break;
+       }
+    }
+}
+
+
+
+
+
+//Initializes all of the arrays for the cities and missiles
+void initializeStructures(tower towers[],city * cities, missile * enemyMissiles, missile *myMissile, explosion *explosions){
+    size_t i;      
+    for(i=0;i<3;i++){
+       cities[i].x = WIDTH/10*(i+2);
+       cities[i].y = HEIGHT*5/6;
+       cities[i].isAlive = 1;
+    }
+
+    for(i=3;i<6;i++){
+       cities[i].x = WIDTH/10*(i+3);
+       cities[i].y = HEIGHT*5/6;
+       cities[i].isAlive = 1;
+    }
+
+    for(i=0;i<15;i++){
+       enemyMissiles[i].x = -100;
+       enemyMissiles[i].y = -100;
+       enemyMissiles[i].xVel = 0;
+       enemyMissiles[i].yVel = 0;
+       enemyMissiles[i].isAlive = 0;
+       enemyMissiles[i].exp.maxR = 50;
+       enemyMissiles[i].exp.r = 25;
+       enemyMissiles[i].exp.isAlive = 0;
+       enemyMissiles[i].exp.rVel = 0;
+    }
+
+   
+
+    for(i=0;i<3;i++){
+	   towers[i].isAlive = 1;
+	   towers[i].x = WIDTH/10+((i*4)*WIDTH/10);
+	   towers[i].y = HEIGHT*5/6;
+    }  
+
+    myMissile->exp.maxR=50;
+    myMissile->exp.r = 25;
+    myMissile->exp.isAlive = 0;
+    myMissile->exp.rVel = 0;
+    myMissile->x = -100;
+    myMissile->y = -100;
+    myMissile->xDest = 0;
+    myMissile->yDest = 0;
+    myMissile->xVel = 0;
+    myMissile->yVel = 0;
+    myMissile->isAlive = 0;  
+}
+
+
+
+void drawCircle(int xpos, int ypos, float r){
+    gfx_color(255, 174, 66);
+    float i = 0;
+    float angle = (M_PI*2)/100;
+    float x1,x2,y1,y2;
+    
+    for(i=0;i<2*M_PI;i+=angle){
+       x1 = r * cos(i) + xpos;
+       y1 = r * -sin(i) + ypos;
+       x2 = r * cos(i+angle) + xpos;
+       y2 = r * -sin(i+angle) + ypos;     
+       gfx_line(x1,y1,x2,y2);
+    }
+}
+
+//Shoot a missile from the user
+void shootMissile(tower towers[], missile * myMissile){
+    if(myMissile->isAlive == 0){
+       myMissile->xDest = gfx_xpos();
+       myMissile->yDest = gfx_ypos();
+       double xStart,yStart = 5*HEIGHT/6;  
+
+       if(myMissile->xDest >= 2*WIDTH/3){   //If you shoot from the right side:
+     	  if(towers[2].isAlive){
+		xStart = WIDTH/10*9+10; //Right side
+          }
+	  else if (towers[1].isAlive){
+	  	xStart = WIDTH/10*5+10; //Middle
+	  }
+          else if (towers[0].isAlive){
+	        xStart = WIDTH/10+10; //Left side
+          }else return;
+          
+       }else if (myMissile->xDest <= WIDTH/3){  //Shooting from the left side:
+
+           if(towers[0].isAlive){
+		xStart = WIDTH/10+10; //Left side
+       	   }
+           else if (towers[1].isAlive){
+		xStart = WIDTH/10*5+10; //Middle
+           }
+           else if (towers[2].isAlive){
+        	xStart = WIDTH/10*9+10; //Right side
+       	   }else return;
+       	   
+       }else{            //Shooting from the middle:
+
+           if(towers[1].isAlive){
+        	xStart = WIDTH/10*5+10; //Middle
+           }
+           else if (towers[2].isAlive){
+       		xStart = WIDTH/10*9+10; //Right side
+           }
+           else if (towers[0].isAlive){
+       		 xStart = WIDTH/10+10; //Left side
+           }else return;
+       }
+       
+       myMissile->isAlive = 1;   
+       myMissile->y = yStart;    myMissile->xStart =xStart;
+       myMissile->x = xStart;    myMissile->yStart = yStart;
+       double x = myMissile->xDest - xStart;
+       double y = yStart -myMissile->yDest;
+       myMissile->yVel = (-y/sqrt(pow(y,2)+pow(x,2)))*4;
+       myMissile->xVel = (x/sqrt(pow(y,2)+pow(x,2)))*4;
+       return;
+    }    
+}
+
+
+//Update the position of the user's missile
+void updateMyMissiles(missile *myMissile, explosion * explosions){
+    if(myMissile->isAlive==1){
+    
+           if(myMissile->y <= myMissile->yDest){ //If the missile is at/past the point that the user clicked, the missile explodes
+               myMissile->isAlive = 0;
+               startExplosion(myMissile);
+           }
+
+           myMissile->x += myMissile->xVel;  //Update the position of the missile
+           myMissile->y += myMissile->yVel;     
+    }
+}
+
+
+
+//Draw the player's missile
+void drawMyMissile(missile *myMissile){
+    if(myMissile->isAlive == 1){    
+       gfx_color(0,0,255);
+       gfx_line(myMissile->xStart,myMissile->yStart,myMissile->x,myMissile->y);
+    }
+}
+
+
+//Shoots a missile after a certain amount of time.
+void startEnemyMissile(tower towers[],city cities[],missile enemyMissiles[],time_t *timeSinceMissile, time_t difficulty){
+   int i,t,destIsValid=0,destIsTower=0;
+   for(i=0;i<15;i++){
+   
+       if(enemyMissiles[i].isAlive == 0){
+		       double speed = difftime(time(NULL),difficulty);
+                       double diff = difftime(time(NULL),*timeSinceMissile);
+                       if(diff>=1){   //Enough time has passed that it is good to shoot another missile:
+
+                           *timeSinceMissile = time(NULL); //Reset the timer
+               		   enemyMissiles[i].isAlive = 1; //Set the missile to be active
+                           enemyMissiles[i].yStart = 0;
+                           enemyMissiles[i].xStart = rand()%600;
+               		   enemyMissiles[i].yDest = HEIGHT*5/6;
+
+               
+
+               		   while(!destIsValid){
+
+                   		destIsTower=0;
+                   		t=rand()%9+1; //Will give the location of one of the buildings on the ground.      
+
+                   		switch(t){
+                   		    case 1: t=0; destIsTower=1; break;
+                    		    case 5: t=1; destIsTower=1; break;
+                      		    case 9: t=2; destIsTower=1; break;
+                       	 	    case 2: t=0; break;
+                       	            case 3: t=1; break;
+		                    case 4: t=2; break;
+		                    case 6: t=3; break;
+		                    case 7: t=4; break;
+		                    case 8: t=5; break;
+
+                   	  }
+
+                          if(destIsTower){
+
+                       		if(towers[t].isAlive){
+                            		destIsValid = 1;
+                            		enemyMissiles[i].xDest = towers[t].x+5;
+                       		}
+                   	  }
+
+                   	  else{
+
+                       		if(cities[t].isAlive){
+                         	        destIsValid = 1;
+                          	        enemyMissiles[i].xDest = cities[t].x+5;
+                       		}
+                  	  }
+
+               		}
+               		
+		       enemyMissiles[i].y = enemyMissiles[i].yStart;
+		       enemyMissiles[i].x = enemyMissiles[i].xStart;
+		       double x = enemyMissiles[i].xDest - enemyMissiles[i].xStart;
+		       double y = enemyMissiles[i].yStart -enemyMissiles[i].yDest;
+		       enemyMissiles[i].yVel =  speed/100*(-y/sqrt(pow(y,2)+pow(x,2)));
+                       enemyMissiles[i].xVel =  speed/100*(x/sqrt(pow(y,2)+pow(x,2)));
+               	}
+       }
+   }
+}
+
+
+//Updates each enemy missile's position and status
+void updateEnemyMissiles(missile *myMissile,tower towers[],city * cities,missile *enemyMissiles, explosion* explosions, time_t *timeSinceMissile, int *score, time_t difficulty){
+
+    int i,t=0,isTower=0;
+    for(i=0;i<15;i++){
+
+       if(enemyMissiles[i].isAlive == 1){
+           enemyMissiles[i].x+=enemyMissiles[i].xVel;
+           enemyMissiles[i].y+=enemyMissiles[i].yVel;
+           
+           if(enemyMissiles[i].x >= WIDTH ||  enemyMissiles[i].x <= 0){
+               enemyMissiles[i].isAlive = 0;             
+           }
+           else{
+               int j;
+               for(j=0;j<15;j++){
+                   checkCollision(enemyMissiles,towers,cities,&enemyMissiles[i].exp,&enemyMissiles[i],explosions, score);
+               }
+       	       checkCollision(enemyMissiles,towers,cities,&myMissile->exp,&enemyMissiles[i],explosions,score);
+           }
+       }else{
+
+       	   enemyMissiles[i].x = 0;
+           enemyMissiles[i].y = 0;
+       }
+    }
+}
+
+
+//If the enemy missile is alive, draw it as a blue line.
+void drawEnemyMissiles(missile * enemyMissiles){
+    int i;
+    for(i=0; i<15;i++){
+       if(enemyMissiles[i].isAlive == 1){
+           gfx_color(0,0,255);
+           gfx_line(enemyMissiles[i].xStart,enemyMissiles[i].yStart,enemyMissiles[i].x,enemyMissiles[i].y);
+       }
+    }
+}
+
+//Begin an explosion at the specified point
+void startExplosion(missile * m){
+    m->exp.x = m->x;
+    m->exp.y = m->y;
+    m->exp.rVel = 1;  
+    m->exp.isAlive = 1;  
+    m->exp.r = 25;
+}
+
+//If the explosion is active (isAlive == 1), alter its radius by the value rVel.
+void updateExplosions(missile *m, missile enemyMissiles[]){
+    int i;
+    //Updates explosions from the enemy missiles
+    for(i=0;i<15;i++){
+       if(enemyMissiles[i].exp.isAlive){
+           enemyMissiles[i].exp.r += enemyMissiles[i].exp.rVel;
+           
+           if(enemyMissiles[i].exp.r >= enemyMissiles[i].exp.maxR){
+               enemyMissiles[i].exp.rVel= -1*abs(enemyMissiles[i].exp.rVel);
+           }
+           else if(enemyMissiles[i].exp.r <= 1){        
+               enemyMissiles[i].exp.isAlive = 0;
+           }    
+
+       }
+    }
+  
+    //Updates explosions from the user's missiles
+    if(m->exp.isAlive){
+       m->exp.r += m->exp.rVel;
+       if(m->exp.r >= m->exp.maxR){m->exp.rVel=-1*abs(m->exp.rVel);}
+       else if(m->exp.r <=1) {
+       		m->exp.isAlive=0; 
+       }
+    }
+}
+
+//Draw the explosions that are active.
+void drawExplosions(missile *m, missile enemyMissiles[]){
+    int i;
+    for(i=0;i<15;i++){
+       if(enemyMissiles[i].exp.isAlive){
+           drawCircle(enemyMissiles[i].exp.x, enemyMissiles[i].exp.y,enemyMissiles[i].exp.r);
+       }
+    }
+    if(m->exp.isAlive) drawCircle(m->exp.x,m->exp.y,m->exp.r);
+}
+
+
+//Checks if a missile has hit an explosion, or if it has hit a city or tower
+int checkCollision(missile missiles[],tower towers[],city * cities, explosion * exp, missile * m, explosion * explosions, int * score){
+    float d;
+    int i; 
+    d = pow(pow(m->x-exp->x,2)+pow(m->y-exp->y,2),.5);
+    
+    if(exp->isAlive && m->isAlive && d <= exp->r){
+ 	startExplosion(m);   
+	*score = *score +10;   
+	m->isAlive = 0; 
+    }
+   	
+    for(i=0;i<15;i++){
+		d = pow(pow(m->x-missiles[i].exp.x,2)+pow(m->y-missiles[i].exp.y,2),.5);
+		if(missiles[i].exp.isAlive && m->isAlive && d<= missiles[i].exp.r){
+			startExplosion(m);
+			*score = *score+10; 
+			m->isAlive=0; 	
+		}
+    }
+
+    //Checks for collisions with cities
+    int j;
+    for(j=0;j<NUMCITIES;j++){
+       if(m->x >= cities[j].x-10 && m->y >= cities[j].y && m->x <= cities[j].x+42){
+           cities[j].isAlive = 0;
+           m->isAlive = 0;
+           startExplosion(m);
+           return 1;
+       }
+    }
+
+    //Checks for collisions with missile towers
+    for(j=0;j<3;j++){
+       if(m->x >towers[j].x-2 && m->x < towers[j].x+30 && m->y >= towers[j].y){
+           towers[j].isAlive = 0;
+           m->isAlive = 0;
+           startExplosion(m);
+           return 1;
+       }
+    }
+    return 0;
+}
+
+//Updates all of the objects on the screen
+void updateObjects(tower towers[] ,city * cities, missile * enemyMissiles, missile *myMissile, explosion * explosions,time_t * timeSinceMissile, int * score, time_t difficulty){
+    startEnemyMissile(towers,cities,enemyMissiles,timeSinceMissile, difficulty);
+    updateEnemyMissiles(myMissile,towers,cities,enemyMissiles,explosions, timeSinceMissile,score,difficulty);
+    updateExplosions(myMissile,enemyMissiles);
+    updateMyMissiles(myMissile, explosions);
+
+       
+    drawTowers(towers);
+    drawCities(cities);
+    drawExplosions(myMissile,enemyMissiles);     
+    drawEnemyMissiles(enemyMissiles);
+    drawMyMissile(myMissile);
+}
+
+
+//Checks if the game is over (if all cities have been destroyed
+int checkGameOver(city *cities){
+    int i;
+    for(i=0;i<NUMCITIES;i++){
+       if(cities[i].isAlive){
+           return 0;
+       }
+    }
+    return 1;
+}
