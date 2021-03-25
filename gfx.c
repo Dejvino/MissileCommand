@@ -69,11 +69,18 @@ void gfx_open( int width, int height, const char *title )
 	XSetForeground(gfx_display, gfx_gc, whiteColor);
 
 	// Wait for the MapNotify event
-
 	for(;;) {
 		XEvent e;
 		XNextEvent(gfx_display, &e);
 		if (e.type == MapNotify)
+			break;
+	}
+
+	// Wait for the ConfigureNotify event
+	for(;;) {
+		XEvent e;
+		XNextEvent(gfx_display, &e);
+		if (e.type == ConfigureNotify)
 			break;
 	}
 }
