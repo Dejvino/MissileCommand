@@ -224,12 +224,14 @@ void saveScore(int score){
 }
 
 void drawMainMenu(void){
+    gfx_clear();
     drawWord("missile", 100, 100, 50, 20);
     gfx_color(255,0,0);
     drawWord("command", 120, 200, 50, 20);
     gfx_color(255,255,255);
     drawWord("press",100,400,50,20);
     drawS(280,400,50,20);
+    gfx_flush();
 }
 
 // Display a Game Over screen with the score
@@ -258,11 +260,9 @@ void drawGameOver(int score){
 
 void mainMenu(void){
     int main = 1;
-    
-    while(main){
-    
+
+    while(main) {
        drawMainMenu();
-       usleep(2000);
        char c = gfx_wait();
        
        switch(c){
