@@ -13,6 +13,22 @@
 #define M_PI 3.1415
 #endif
 
+#define COLOR_BACKGROUND 255, 0, 0
+#define COLOR_MENU_TITLE 255, 0, 0
+#define COLOR_MENU_TEXT 255, 255, 255
+#define COLOR_GAME_OVER_TITLE 255, 0, 0
+#define COLOR_GAME_OVER_SCORE 0, 255, 0
+#define COLOR_AMMO_FONT 0, 0, 0
+#define COLOR_ENEMY_TRAIL 255, 50, 50
+#define COLOR_ENEMY_HEAD 255, 255, 255
+#define COLOR_MISSILE_TRAIL 0, 0, 255
+#define COLOR_MISSILE_HEAD 255, 255, 255
+#define COLOR_MISSILE_CROSS 0, 255, 0
+#define COLOR_CITY 0, 0, 255
+#define COLOR_TOWER 0, 255, 0
+#define COLOR_EXPLOSION 255, 174, 66
+#define COLOR_SCORE 66, 234, 66
+
 int numCities = 6;
 int numEnemies = 15;
 int numTowers = 3;
@@ -146,6 +162,7 @@ int main(void)
         }
         drawBackground(); //Draw the background of the game
         updateObjects(towers, cities, enemyMissiles, myMissiles, explosions, &timeSinceMissile, &score, difficulty);
+        gfx_color(COLOR_SCORE);
         draw_number(40, 40, 50, score);
         gfx_flush(); //Update the graphics
         usleep(10000);
@@ -162,7 +179,7 @@ int main(void)
 
 void drawCity(int x, int y)
 {
-    gfx_color(0, 0, 255);
+    gfx_color(COLOR_CITY);
     int i;
     for (i = x; i < x + 30; i++)
     {                              //Draw a base that is 30 pixels wide, starting at x
@@ -178,7 +195,7 @@ void drawCity(int x, int y)
 //Draws a missileTower at a given location
 void drawMissileTower(int x, int y)
 {
-    gfx_color(0, 255, 0);
+    gfx_color(COLOR_TOWER);
     int i;
     for (i = x; i < x + 20; i++)
     {                              //Draw a base that is 20 pixels wide, starting at x
@@ -214,7 +231,7 @@ void drawAmmo(tower towers[])
         int x = towers[i].x;
         int y = HEIGHT * 5 / 6 + 20;
         int ammo = towers[i].ammo;
-        gfx_color(0, 0, 0);
+        gfx_color(COLOR_AMMO_FONT);
         draw_number(x, y, 15, ammo);
         if (ammo <= 0)
         {
@@ -231,7 +248,7 @@ void drawAmmo(tower towers[])
 void drawBackground(void)
 {
     gfx_clear();
-    gfx_color(255, 0, 0);
+    gfx_color(COLOR_BACKGROUND);
     drawLand();
 }
 
@@ -277,10 +294,10 @@ void saveScore(int score)
 void drawMainMenu(void)
 {
     gfx_clear();
+    gfx_color(COLOR_MENU_TITLE);
     drawWord("missile", 100, 100, 50, 20);
-    gfx_color(255, 0, 0);
     drawWord("command", 120, 200, 50, 20);
-    gfx_color(255, 255, 255);
+    gfx_color(COLOR_MENU_TEXT);
     drawWord("press", 100, 400, 50, 20);
     drawS(280, 400, 50, 20);
     gfx_flush();
@@ -303,10 +320,10 @@ void gameOver(int score)
 void drawGameOver(int score)
 {
     gfx_clear();
-    gfx_color(255, 0, 0);
+    gfx_color(COLOR_GAME_OVER_TITLE);
     drawWord("game", 200, 120, 100, 40);
     drawWord("over", 200, 240, 100, 40);
-    gfx_color(0, 255, 0);
+    gfx_color(COLOR_GAME_OVER_SCORE);
     drawWord("your score", 50, 340, 50, 20);
     draw_number(400, 290, 50, score);
     //gfx_color(255,255,255);
@@ -393,7 +410,7 @@ void initializeStructures(tower towers[], city *cities, missile *enemyMissiles, 
 
 void drawCircle(int xpos, int ypos, float r)
 {
-    gfx_color(255, 174, 66);
+    gfx_color(COLOR_EXPLOSION);
     float i = 0;
     float angle = (M_PI * 2) / 100;
     float x1, x2, y1, y2;
@@ -474,9 +491,11 @@ void drawMyMissiles(missile *myMissiles)
         missile *myMissile = &myMissiles[i];
         if (myMissile->isAlive == 1)
         {
-            gfx_color(0, 0, 255);
+            gfx_color(COLOR_MISSILE_TRAIL);
             gfx_line(myMissile->xStart, myMissile->yStart, myMissile->x, myMissile->y);
-            gfx_color(0, 255, 0);
+            gfx_color(COLOR_MISSILE_HEAD);
+            gfx_point(myMissile->x, myMissile->y);
+            gfx_color(COLOR_MISSILE_CROSS);
             drawCross(myMissile->xDest, myMissile->yDest, 5);
         }
     }
@@ -580,9 +599,9 @@ void drawEnemyMissiles(missile *enemyMissiles)
     {
         if (enemyMissiles[i].isAlive == 1)
         {
-            gfx_color(255, 50, 50);
+            gfx_color(COLOR_ENEMY_TRAIL);
             gfx_line(enemyMissiles[i].xStart, enemyMissiles[i].yStart, enemyMissiles[i].x, enemyMissiles[i].y);
-            gfx_color(255, 255, 255);
+            gfx_color(COLOR_ENEMY_HEAD);
             gfx_point(enemyMissiles[i].x, enemyMissiles[i].y);
         }
     }
