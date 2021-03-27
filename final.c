@@ -8,12 +8,16 @@
 #include <limits.h>
 #define WIDTH 600
 #define HEIGHT 500
-#define EXPNUM 14 //Number of explosions that can be used at once
+
+#ifndef M_PI
+#define M_PI 3.1415
+#endif
 
 int numCities = 6;
 int numEnemies = 15;
 int numTowers = 3;
 int numMissiles = 15;
+int numExplosions = 20;
 int initialAmmo = 4 + 3 + 2 + 1;
 
 int keysShoot[] = {
@@ -43,7 +47,6 @@ struct Missile
     double xVel; //The velocity of the missile
     double yVel;
     int isAlive; //If the missile is currently active
-    struct Explosion exp;
 };
 
 struct Missile_Node
@@ -76,18 +79,17 @@ void drawBackground(void);
 void drawCities(city *cities);
 void drawLand(void);
 void mainMenu(void);
-void initializeStructures(tower towers[], int ammo[], city *cities, missile *enemyMissiles, missile *myMissiles, explosion *explosions);
+void initializeStructures(tower towers[], int ammo[], city cities[], missile enemyMissiles[], missile myMissiles[], explosion explosions[]);
 void shootMissile(tower towers[], missile *myMissiles);
-void updateMyMissiles(missile *myMissiles, explosion *explosions);
-void drawMyMissiles(missile *myMissiles);
-void startExplosion(missile *m);
-void updateExplosions(missile *m, missile enemyMissiles[]);
-void drawExplosions(missile *m, missile enemyMissiles[]);
+void updateMyMissiles(missile myMissiles[], explosion explosions[]);
+void drawMyMissiles(missile myMissiles[]);
+void startExplosion(missile *m, explosion explosions[]);
+void updateExplosions(explosion explosions[]);
+void drawExplosions(explosion explosions[]);
 void drawCircle(int xpos, int ypos, float r);
-void updateEnemyMissiles(missile *myMissile, tower towers[], city *cities, missile *enemyMissiles, explosion *explosions, time_t *timeSinceMissile, int *score, time_t difficulty);
+void updateEnemyMissiles(missile *myMissile, tower towers[], city *cities, missile *enemyMissiles, explosion explosions[], time_t *timeSinceMissile, int *score, time_t difficulty);
 void drawEnemyMissiles(missile *enemyMissiles);
-int checkCollision(missile missiles[], tower towers[], city *cities, explosion *exp, missile *m, explosion *explosions, int *score);
-void updateObjects(tower towers[], int ammo[], city *cities, missile *enemyMissiles, missile *myMissile, explosion *explosions, time_t *timeSinceMissile, int *score, time_t difficulty);
+void updateObjects(tower towers[], int ammo[], city *cities, missile *enemyMissiles, missile *myMissile, explosion explosions[], time_t *timeSinceMissile, int *score, time_t difficulty);
 int checkGameOver(city *cities);
 void drawMissileTower(int x, int y);
 void drawTowers(tower towers[]);
@@ -117,7 +119,7 @@ int main(void)
     city cities[numCities];
     missile enemyMissiles[numEnemies];
     missile myMissiles[numMissiles];
-    explosion explosions[EXPNUM];
+    explosion explosions[numExplosions];
 
     //Set up all of the structures:
     initializeStructures(towers, ammo, cities, enemyMissiles, myMissiles, explosions);
@@ -324,7 +326,7 @@ void mainMenu(void)
 }
 
 //Initializes all of the arrays for the cities and missiles
-void initializeStructures(tower towers[], int ammo[], city *cities, missile *enemyMissiles, missile *myMissiles, explosion *explosions)
+void initializeStructures(tower towers[], int ammo[], city *cities, missile *enemyMissiles, missile *myMissiles, explosion explosions[])
 {
     size_t i;
     for (i = 0; i < numCities / 2; i++)
@@ -348,10 +350,6 @@ void initializeStructures(tower towers[], int ammo[], city *cities, missile *ene
         enemyMissiles[i].xVel = 0;
         enemyMissiles[i].yVel = 0;
         enemyMissiles[i].isAlive = 0;
-        enemyMissiles[i].exp.maxR = 50;
-        enemyMissiles[i].exp.r = 25;
-        enemyMissiles[i].exp.isAlive = 0;
-        enemyMissiles[i].exp.rVel = 0;
     }
 
     for (i = 0; i < numTowers; i++)
@@ -364,10 +362,6 @@ void initializeStructures(tower towers[], int ammo[], city *cities, missile *ene
     
     for (i = 0; i < numMissiles; i++)
     {
-        myMissiles[i].exp.maxR = 50;
-        myMissiles[i].exp.r = 25;
-        myMissiles[i].exp.isAlive = 0;
-        myMissiles[i].exp.rVel = 0;
         myMissiles[i].x = -100;
         myMissiles[i].y = -100;
         myMissiles[i].xDest = 0;
@@ -375,6 +369,14 @@ void initializeStructures(tower towers[], int ammo[], city *cities, missile *ene
         myMissiles[i].xVel = 0;
         myMissiles[i].yVel = 0;
         myMissiles[i].isAlive = 0;
+    }
+
+    for (i = 0; i < numExplosions; i++)
+    {
+        explosions[i].maxR = 50;
+        explosions[i].r = 25;
+        explosions[i].isAlive = 0;
+        explosions[i].rVel = 1;
     }
 }
 
@@ -441,15 +443,14 @@ void updateMyMissiles(missile myMissiles[], explosion *explosions)
         missile *myMissile = &myMissiles[i];
         if (myMissile->isAlive == 1)
         {
+            myMissile->x += myMissile->xVel;
+            myMissile->y += myMissile->yVel;
 
             if (myMissile->y <= myMissile->yDest)
             { //If the missile is at/past the point that the user clicked, the missile explodes
                 myMissile->isAlive = 0;
-                startExplosion(myMissile);
+                startExplosion(myMissile, explosions);
             }
-
-            myMissile->x += myMissile->xVel; //Update the position of the missile
-            myMissile->y += myMissile->yVel;
         }
     }
 }
@@ -475,10 +476,9 @@ void startEnemyMissile(tower towers[], city cities[], missile enemyMissiles[], t
     int i, t, destIsValid = 0, destIsTower = 0;
     for (i = 0; i < numEnemies; i++)
     {
-
         if (enemyMissiles[i].isAlive == 0)
         {
-            double speed = difftime(time(NULL), difficulty);
+            double speed = 30; //difftime(time(NULL), difficulty);
             double diff = difftime(time(NULL), *timeSinceMissile);
             if (diff >= 1)
             { //Enough time has passed that it is good to shoot another missile:
@@ -491,9 +491,8 @@ void startEnemyMissile(tower towers[], city cities[], missile enemyMissiles[], t
 
                 while (!destIsValid)
                 {
-
                     destIsTower = 0;
-                    t = rand() % (numCities + numTowers) + 1; //Will give the location of one of the buildings on the ground.
+                    t = rand() % (numCities + numTowers);
 
                     if (t >= numCities) {
                         destIsTower = 1;
@@ -502,17 +501,14 @@ void startEnemyMissile(tower towers[], city cities[], missile enemyMissiles[], t
                     
                     if (destIsTower)
                     {
-
                         if (towers[t].isAlive)
                         {
                             destIsValid = 1;
                             enemyMissiles[i].xDest = towers[t].x + 5;
                         }
                     }
-
                     else
                     {
-
                         if (cities[t].isAlive)
                         {
                             destIsValid = 1;
@@ -533,13 +529,13 @@ void startEnemyMissile(tower towers[], city cities[], missile enemyMissiles[], t
 }
 
 //Updates each enemy missile's position and status
-void updateEnemyMissiles(missile myMissiles[], tower towers[], city *cities, missile *enemyMissiles, explosion *explosions, time_t *timeSinceMissile, int *score, time_t difficulty)
+void updateEnemyMissiles(missile myMissiles[], tower towers[], city *cities, missile *enemyMissiles, explosion explosions[], time_t *timeSinceMissile, int *score, time_t difficulty)
 {
 
     int i, t = 0, isTower = 0;
     for (i = 0; i < numEnemies; i++)
     {
-
+        missile *missile = &enemyMissiles[i];
         if (enemyMissiles[i].isAlive == 1)
         {
             enemyMissiles[i].x += enemyMissiles[i].xVel;
@@ -551,15 +547,8 @@ void updateEnemyMissiles(missile myMissiles[], tower towers[], city *cities, mis
             }
             else
             {
-                int j;
-                for (j = 0; j < numEnemies; j++)
-                {
-                    checkCollision(enemyMissiles, towers, cities, &enemyMissiles[i].exp, &enemyMissiles[i], explosions, score);
-                }
-                for (j = 0; j < numMissiles; j++)
-                {
-                    checkCollision(enemyMissiles, towers, cities, &myMissiles[j].exp, &enemyMissiles[i], explosions, score);
-                }
+                checkGroundCollision(missile, towers, cities, explosions, score);
+                checkExplosionsCollision(missile, explosions, score);
             }
         }
         else
@@ -579,99 +568,68 @@ void drawEnemyMissiles(missile *enemyMissiles)
     {
         if (enemyMissiles[i].isAlive == 1)
         {
-            gfx_color(0, 0, 255);
+            gfx_color(255, 50, 50);
             gfx_line(enemyMissiles[i].xStart, enemyMissiles[i].yStart, enemyMissiles[i].x, enemyMissiles[i].y);
+            gfx_color(255, 255, 255);
+            gfx_point(enemyMissiles[i].x, enemyMissiles[i].y);
         }
     }
 }
 
 //Begin an explosion at the specified point
-void startExplosion(missile *m)
+void startExplosion(missile *m, explosion explosions[])
 {
-    m->exp.x = m->x;
-    m->exp.y = m->y;
-    m->exp.rVel = 1;
-    m->exp.isAlive = 1;
-    m->exp.r = 25;
+    for (int i = 0; i < numExplosions; i++) {
+        explosion *exp = &explosions[i];
+        if (exp->isAlive) {
+            continue;
+        }
+        exp->x = m->x;
+        exp->y = m->y;
+        exp->rVel = 1;
+        exp->isAlive = 1;
+        exp->r = 25;
+        return;
+    }
 }
 
 //If the explosion is active (isAlive == 1), alter its radius by the value rVel.
-void updateExplosions(missile *m, missile enemyMissiles[])
+void updateExplosions(explosion explosions[])
 {
-    int i;
-    //Updates explosions from the enemy missiles
-    for (i = 0; i < numEnemies; i++)
+    for (int i = 0; i < numExplosions; i++)
     {
-        if (enemyMissiles[i].exp.isAlive)
+        explosion *exp = &explosions[i];
+        if (exp->isAlive)
         {
-            enemyMissiles[i].exp.r += enemyMissiles[i].exp.rVel;
+            exp->r += exp->rVel;
 
-            if (enemyMissiles[i].exp.r >= enemyMissiles[i].exp.maxR)
+            if (exp->r >= exp->maxR)
             {
-                enemyMissiles[i].exp.rVel = -1 * abs(enemyMissiles[i].exp.rVel);
+                exp->rVel = -1 * abs(exp->rVel);
             }
-            else if (enemyMissiles[i].exp.r <= 1)
+            else if (exp->r <= 1)
             {
-                enemyMissiles[i].exp.isAlive = 0;
+                exp->isAlive = 0;
             }
-        }
-    }
-
-    //Updates explosions from the user's missiles
-    if (m->exp.isAlive)
-    {
-        m->exp.r += m->exp.rVel;
-        if (m->exp.r >= m->exp.maxR)
-        {
-            m->exp.rVel = -1 * abs(m->exp.rVel);
-        }
-        else if (m->exp.r <= 1)
-        {
-            m->exp.isAlive = 0;
         }
     }
 }
 
 //Draw the explosions that are active.
-void drawExplosions(missile *m, missile enemyMissiles[])
+void drawExplosions(explosion explosions[])
 {
-    int i;
-    for (i = 0; i < numEnemies; i++)
+    for (int i = 0; i < numEnemies; i++)
     {
-        if (enemyMissiles[i].exp.isAlive)
+        explosion *exp = &explosions[i];
+        if (exp->isAlive)
         {
-            drawCircle(enemyMissiles[i].exp.x, enemyMissiles[i].exp.y, enemyMissiles[i].exp.r);
+            drawCircle(exp->x, exp->y, exp->r);
         }
     }
-    if (m->exp.isAlive)
-        drawCircle(m->exp.x, m->exp.y, m->exp.r);
 }
 
-//Checks if a missile has hit an explosion, or if it has hit a city or tower
-int checkCollision(missile missiles[], tower towers[], city *cities, explosion *exp, missile *m, explosion *explosions, int *score)
+int checkGroundCollision(missile *m, tower towers[], city cities[], explosion explosions[], int *score)
 {
-    float d;
-    int i;
-    d = pow(pow(m->x - exp->x, 2) + pow(m->y - exp->y, 2), .5);
-
-    if (exp->isAlive && m->isAlive && d <= exp->r)
-    {
-        startExplosion(m);
-        *score = *score + 10;
-        m->isAlive = 0;
-    }
-
-    for (i = 0; i < numEnemies; i++)
-    {
-        d = pow(pow(m->x - missiles[i].exp.x, 2) + pow(m->y - missiles[i].exp.y, 2), .5);
-        if (missiles[i].exp.isAlive && m->isAlive && d <= missiles[i].exp.r)
-        {
-            startExplosion(m);
-            *score = *score + 10;
-            m->isAlive = 0;
-        }
-    }
-
     //Checks for collisions with cities
     int j;
     for (j = 0; j < numCities; j++)
@@ -680,7 +638,7 @@ int checkCollision(missile missiles[], tower towers[], city *cities, explosion *
         {
             cities[j].isAlive = 0;
             m->isAlive = 0;
-            startExplosion(m);
+            startExplosion(m, explosions);
             return 1;
         }
     }
@@ -692,7 +650,35 @@ int checkCollision(missile missiles[], tower towers[], city *cities, explosion *
         {
             towers[j].isAlive = 0;
             m->isAlive = 0;
-            startExplosion(m);
+            startExplosion(m, explosions);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int checkExplosionCollision(missile *m, explosion *exp, explosion explosions[], int *score)
+{
+    if (exp->isAlive == 0 || m->isAlive == 0) {
+        return 0;
+    }
+    float d = pow(pow(m->x - exp->x, 2) + pow(m->y - exp->y, 2), .5);
+    if (d <= exp->r)
+    {
+        startExplosion(m, explosions);
+        *score = *score + 10;
+        m->isAlive = 0;
+        return 1;
+    }
+    return 0;
+}
+
+int checkExplosionsCollision(missile *m, explosion explosions[], int *score)
+{
+    for (int i = 0; i < numEnemies; i++)
+    {
+        explosion *exp = &explosions[i];
+        if (checkExplosionCollision(m, exp, explosions, score) == 1) {
             return 1;
         }
     }
@@ -704,13 +690,13 @@ void updateObjects(tower towers[], int ammo[], city *cities, missile *enemyMissi
 {
     startEnemyMissile(towers, cities, enemyMissiles, timeSinceMissile, difficulty);
     updateEnemyMissiles(myMissiles, towers, cities, enemyMissiles, explosions, timeSinceMissile, score, difficulty);
-    updateExplosions(myMissiles, enemyMissiles);
+    updateExplosions(explosions);
     updateMyMissiles(myMissiles, explosions);
 
     drawTowers(towers);
     //drawAmmo(towers, ammo);
     drawCities(cities);
-    drawExplosions(myMissiles, enemyMissiles);
+    drawExplosions(explosions);
     drawEnemyMissiles(enemyMissiles);
     drawMyMissiles(myMissiles);
 }

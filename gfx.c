@@ -75,14 +75,6 @@ void gfx_open( int width, int height, const char *title )
 		if (e.type == MapNotify)
 			break;
 	}
-
-	// Wait for the ConfigureNotify event
-	for(;;) {
-		XEvent e;
-		XNextEvent(gfx_display, &e);
-		if (e.type == ConfigureNotify)
-			break;
-	}
 }
 
 /* Draw a single point at (x,y) */
@@ -188,6 +180,8 @@ char gfx_wait()
 		} else if (event.type == MotionNotify) {
 			saved_xpos = event.xkey.x;
 			saved_ypos = event.xkey.y;
+		} else if (event.type == ConfigureNotify) {
+			return -1;
 		}
 	}
 }
