@@ -14,6 +14,7 @@
 #endif
 
 #define COLOR_BACKGROUND 255, 0, 0
+#define COLOR_LAND 80, 40, 10
 #define COLOR_MENU_TITLE 255, 0, 0
 #define COLOR_MENU_TEXT 255, 255, 255
 #define COLOR_GAME_OVER_TITLE 255, 0, 0
@@ -268,11 +269,8 @@ void drawCities(city cities[])
 //Draws a rectangle at the bottom of the screen
 void drawLand(void)
 {
-    int i;
-    for (i = HEIGHT * 5 / 6; i < HEIGHT; i++)
-    {
-        gfx_line(0, i, WIDTH - 1, i);
-    }
+    gfx_color(COLOR_LAND);
+    gfx_fill_rect(0, HEIGHT * 5 / 6, WIDTH - 1, HEIGHT / 6);
 }
 
 void saveScore(int score)
@@ -680,6 +678,7 @@ int checkGroundCollision(missile *m, tower towers[], city cities[], explosion ex
         if (m->x > towers[j].x - 2 && m->x < towers[j].x + 30 && m->y >= towers[j].y)
         {
             towers[j].isAlive = 0;
+            towers[j].ammo = 0;
             m->isAlive = 0;
             startExplosion(m, explosions);
             return 1;

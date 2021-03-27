@@ -91,6 +91,16 @@ void gfx_line( int x1, int y1, int x2, int y2 )
 	XDrawLine(gfx_display,gfx_window,gfx_gc,x1,y1,x2,y2);
 }
 
+void gfx_rect(int x, int y, int w, int h)
+{
+	XDrawRectangle(gfx_display, gfx_window, gfx_gc, x, y, w, h);
+}
+
+void gfx_fill_rect(int x, int y, int w, int h)
+{
+	XFillRectangle(gfx_display, gfx_window, gfx_gc, x, y, w, h);
+}
+
 /* Change the current drawing color. */
 
 void gfx_color( int r, int g, int b )
