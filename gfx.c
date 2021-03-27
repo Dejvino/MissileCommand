@@ -185,6 +185,9 @@ char gfx_wait()
 			saved_xpos = event.xkey.x;
 			saved_ypos = event.xkey.y;
 			return event.xbutton.button;
+		} else if (event.type == MotionNotify) {
+			saved_xpos = event.xkey.x;
+			saved_ypos = event.xkey.y;
 		}
 	}
 }
